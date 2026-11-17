@@ -59,8 +59,9 @@ header { display: flex; flex-direction: column; gap: 14px; border-bottom: 4px so
 .people .yr { font-size: 0.85rem; color: var(--gold-ink); font-weight: 600; margin-left: 6px; font-variant-numeric: tabular-nums; }
 .people .nt { display: block; font-size: 0.88rem; color: var(--muted); }
 .empty { color: var(--muted); font-size: 0.95rem; border-top: 1px solid var(--line); padding-top: 10px; }
-.unsure { margin-top: 16px; background: var(--sunk); border-radius: 6px; padding: 12px 16px; font-size: 0.95rem; overflow-wrap: anywhere; }
-.unsure strong { font-weight: 600; }
+.maybe { background: var(--sunk); border-radius: 5px; padding: 8px 12px; font-size: 0.92rem; color: var(--muted); overflow-wrap: anywhere; }
+.maybe strong { font-weight: 600; color: var(--ink); }
+.seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 
 form { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 20px 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 @media (max-width: 620px) { form { grid-template-columns: minmax(0, 1fr); } }
@@ -111,6 +112,7 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
         </div>
         <ul class="people" id="l-nov28"></ul>
         <p class="empty" id="e-nov28">Nobody yet. Be the first.</p>
+        <p class="maybe" id="m-nov28" hidden></p>
       </div>
       <div class="day">
         <div class="day-head">
@@ -119,9 +121,9 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
         </div>
         <ul class="people" id="l-dec5"></ul>
         <p class="empty" id="e-dec5">Nobody yet. Be the first.</p>
+        <p class="maybe" id="m-dec5" hidden></p>
       </div>
     </div>
-    <p class="unsure" id="unsure" hidden></p>
   </section>
 
   <section aria-labelledby="form-h">
@@ -129,11 +131,21 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
     <form id="form" novalidate>
       <div class="field"><label for="name">Name</label><input type="text" id="name" name="name" maxlength="60" autocomplete="name" required></div>
       <div class="field"><label for="year">Class year</label><input type="text" id="year" name="year" inputmode="numeric" maxlength="4" required></div>
-      <fieldset class="full">
-        <legend>Which day?</legend>
-        <label class="opt"><input type="checkbox" name="days" value="nov28"> Saturday, Nov 28</label>
-        <label class="opt"><input type="checkbox" name="days" value="dec5"> Saturday, Dec 5</label>
-        <label class="opt"><input type="checkbox" name="days" value="unsure"> Not sure yet</label>
+      <fieldset>
+        <legend>Saturday, Nov 28</legend>
+        <div class="seg">
+          <label class="opt"><input type="radio" name="nov28" value="yes"> Yes</label>
+          <label class="opt"><input type="radio" name="nov28" value="maybe"> Maybe</label>
+          <label class="opt"><input type="radio" name="nov28" value="no" checked> No</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Saturday, Dec 5</legend>
+        <div class="seg">
+          <label class="opt"><input type="radio" name="dec5" value="yes"> Yes</label>
+          <label class="opt"><input type="radio" name="dec5" value="maybe"> Maybe</label>
+          <label class="opt"><input type="radio" name="dec5" value="no" checked> No</label>
+        </div>
       </fieldset>
       <div class="field full"><label for="note">Anything you're hoping to see or take home? <span class="muted">(optional)</span></label><textarea id="note" name="note" maxlength="300"></textarea></div>
       <div class="hp" aria-hidden="true"><label for="hp2">Leave this empty</label><input type="text" id="hp2" name="hp2" tabindex="-1" autocomplete="off"></div>
@@ -158,9 +170,14 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
 
   function render(people) {
     if (!Array.isArray(people)) people = [];
-    people = people.filter(function (p) { return p && typeof p.name === "string" && Array.isArray(p.days); }).sort(byYearThenName);
+    people = people.filter(function (p) { return p && typeof p.name === "string"; }).sort(byYearThenName);
+    function answer(p, day) {
+      if (p[day] === "yes" || p[day] === "maybe") return p[day];
+      return Array.isArray(p.days) && p.days.indexOf(day) !== -1 ? "yes" : "";
+    }
     ["nov28", "dec5"].forEach(function (day) {
-      var list = $("l-" + day), going = people.filter(function (p) { return p.days.indexOf(day) !== -1; });
+      var list = $("l-" + day), going = people.filter(function (p) { return answer(p, day) === "yes"; });
+      var maybes = people.filter(function (p) { return answer(p, day) === "maybe"; });
       list.textContent = "";
       going.forEach(function (p) {
         var li = document.createElement("li"), nm = document.createElement("span");
@@ -171,16 +188,15 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
         list.appendChild(li);
       });
       $("n-" + day).textContent = going.length;
-      $("e-" + day).hidden = going.length > 0;
+      $("e-" + day).hidden = going.length > 0 || maybes.length > 0;
+      var box = $("m-" + day);
+      box.textContent = "";
+      if (maybes.length) {
+        var s = document.createElement("strong"); s.textContent = "Maybe (" + maybes.length + "): "; box.appendChild(s);
+        box.appendChild(document.createTextNode(maybes.map(function (p) { var sy = shortYear(p.year); return p.name + (sy ? " " + sy : ""); }).join(", ")));
+      }
+      box.hidden = !maybes.length;
     });
-    var unsure = people.filter(function (p) { return p.days.indexOf("unsure") !== -1 && p.days.indexOf("nov28") === -1 && p.days.indexOf("dec5") === -1; });
-    var box = $("unsure");
-    box.textContent = "";
-    if (unsure.length) {
-      var s = document.createElement("strong"); s.textContent = "Not sure yet: "; box.appendChild(s);
-      box.appendChild(document.createTextNode(unsure.map(function (p) { var sy = shortYear(p.year); return p.name + (sy ? " " + sy : ""); }).join(", ")));
-    }
-    box.hidden = !unsure.length;
   }
 
   function showMsg(text, kind) { var m = $("msg"); m.textContent = text; m.className = "full msg " + kind; m.hidden = false; }
@@ -196,16 +212,17 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
     ev.preventDefault();
     if (busy) return;
     var name = $("name").value.trim(), year = $("year").value.trim();
-    var days = Array.prototype.slice.call(document.querySelectorAll('input[name="days"]:checked')).map(function (c) { return c.value; });
+    function picked(day) { var c = document.querySelector('input[name="' + day + '"]:checked'); return c ? c.value : "no"; }
+    var nov28 = picked("nov28"), dec5 = picked("dec5");
     $("name").removeAttribute("aria-invalid"); $("year").removeAttribute("aria-invalid");
     if (name.length < 2) { showMsg("Please enter your name.", "err"); $("name").setAttribute("aria-invalid", "true"); $("name").focus(); return; }
     if (!/^(19[4-9][0-9]|20[0-2][0-9])$/.test(year)) { showMsg("Please enter a 4-digit class year, like 2004.", "err"); $("year").setAttribute("aria-invalid", "true"); $("year").focus(); return; }
-    if (!days.length) { showMsg("Pick at least one day, or Not sure yet.", "err"); document.querySelector('input[name="days"]').focus(); return; }
+    if (nov28 === "no" && dec5 === "no") { showMsg("Pick Yes or Maybe for at least one day.", "err"); document.querySelector('input[name="nov28"]').focus(); return; }
     busy = true; $("submit").disabled = true; $("submit").textContent = "Saving…"; $("msg").hidden = true;
     fetch(API, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ name: name, year: year, days: days, note: $("note").value, hp2: $("hp2").value })
+      body: JSON.stringify({ name: name, year: year, nov28: nov28, dec5: dec5, note: $("note").value, hp2: $("hp2").value })
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (!d || !d.ok) { showMsg((d && d.error) || "Couldn't save. Please try again.", "err"); return; }
       render(d.people);
