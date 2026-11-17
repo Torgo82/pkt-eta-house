@@ -219,8 +219,12 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
     if (!/^(19[4-9][0-9]|20[0-2][0-9])$/.test(year)) { showMsg("Please enter a 4-digit class year, like 2004.", "err"); $("year").setAttribute("aria-invalid", "true"); $("year").focus(); return; }
     if (nov28 === "no" && dec5 === "no") { showMsg("Pick Yes or Maybe for at least one day.", "err"); document.querySelector('input[name="nov28"]').focus(); return; }
     busy = true; $("submit").disabled = true; $("submit").textContent = "Saving…"; $("msg").hidden = true;
+    // Never leave the button stuck: give up after 25 seconds and say so.
+    var ctl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 25000);
     fetch(API, {
       method: "POST",
+      signal: ctl ? ctl.signal : undefined,
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ name: name, year: year, nov28: nov28, dec5: dec5, note: $("note").value, hp2: $("hp2").value })
     }).then(function (r) { return r.json(); }).then(function (d) {
@@ -230,9 +234,10 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
       showMsg(done, "ok"); $("status").textContent = done;
       $("form").reset();
       $("who-h").scrollIntoView({ behavior: "smooth", block: "start" });
-    }).catch(function () {
-      showMsg("Couldn't save right now. Check your connection and try again in a minute.", "err");
-    }).then(function () { busy = false; $("submit").disabled = false; $("submit").textContent = "Sign me up"; });
+    }).catch(function (err) {
+      if (err && err.name === "AbortError") showMsg("That took too long, so we stopped waiting. Refresh the page: if your name isn't on the list, try again.", "err");
+      else showMsg("Couldn't save right now. Check your connection and try again in a minute.", "err");
+    }).then(function () { clearTimeout(timer); busy = false; $("submit").disabled = false; $("submit").textContent = "Sign me up"; });
   });
 
   load();
