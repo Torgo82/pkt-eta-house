@@ -126,6 +126,7 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
         <p class="maybe" id="m-dec5" hidden></p>
       </div>
     </div>
+    <p class="maybe" id="m-out" style="margin-top: 12px" hidden></p>
   </section>
 
   <section aria-labelledby="form-h">
@@ -151,9 +152,9 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
       </fieldset>
       <div class="field full"><label for="note">Anything you're hoping to see or take home? <span class="muted">(optional)</span></label><textarea id="note" name="note" maxlength="300"></textarea></div>
       <div class="hp" aria-hidden="true"><label for="hp2">Leave this empty</label><input type="text" id="hp2" name="hp2" tabindex="-1" autocomplete="off"></div>
-      <div class="full actions"><button type="submit" id="submit">Sign me up</button><span class="fine">Your name, class year and note will show on this page.</span></div>
+      <div class="full actions"><button type="submit" id="submit">Submit</button><span class="fine">Your name, class year and note will show on this page.</span></div>
       <div class="full msg" id="msg" role="alert" hidden></div>
-      <p class="full fine">Already signed up and plans changed? Submit again with the same name and class year and your days will be updated.</p>
+      <p class="full fine">Can't make either day? Leave both on No and submit, so we know. Plans changed? Submit again with the same name and class year and your answer will be updated.</p>
     </form>
   </section>
 
@@ -199,6 +200,13 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
       }
       box.hidden = !maybes.length;
     });
+    var outs = people.filter(function (p) { return !answer(p, "nov28") && !answer(p, "dec5"); }), ob = $("m-out");
+    ob.textContent = "";
+    if (outs.length) {
+      var os = document.createElement("strong"); os.textContent = "Can't make it (" + outs.length + "): "; ob.appendChild(os);
+      ob.appendChild(document.createTextNode(outs.map(function (p) { var sy = shortYear(p.year); return p.name + (sy ? " " + sy : ""); }).join(", ")));
+    }
+    ob.hidden = !outs.length;
   }
 
   function showMsg(text, kind) { var m = $("msg"); m.textContent = text; m.className = "full msg " + kind; m.hidden = false; }
@@ -219,7 +227,6 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
     $("name").removeAttribute("aria-invalid"); $("year").removeAttribute("aria-invalid");
     if (name.length < 2) { showMsg("Please enter your name.", "err"); $("name").setAttribute("aria-invalid", "true"); $("name").focus(); return; }
     if (!/^(19[4-9][0-9]|20[0-2][0-9])$/.test(year)) { showMsg("Please enter a 4-digit class year, like 2004.", "err"); $("year").setAttribute("aria-invalid", "true"); $("year").focus(); return; }
-    if (nov28 === "no" && dec5 === "no") { showMsg("Pick Yes or Maybe for at least one day.", "err"); document.querySelector('input[name="nov28"]').focus(); return; }
     busy = true; $("submit").disabled = true; $("submit").textContent = "Saving…"; $("msg").hidden = true;
     // Never leave the button stuck: give up after 25 seconds and say so.
     var ctl = typeof AbortController === "function" ? new AbortController() : null;
@@ -232,14 +239,15 @@ footer { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--li
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (!d || !d.ok) { showMsg((d && d.error) || "Couldn't save. Please try again.", "err"); return; }
       render(d.people);
-      var done = d.updated ? "Updated. Your sign-up now shows your new days." : "You're on the list. See you at the house.";
+      var out = nov28 === "no" && dec5 === "no";
+      var done = out ? "Got it. Sorry you can't make it." : d.updated ? "Updated. Your sign-up now shows your new days." : "You're on the list. See you at the house.";
       showMsg(done, "ok"); $("status").textContent = done;
       $("form").reset();
       $("who-h").scrollIntoView({ behavior: "smooth", block: "start" });
     }).catch(function (err) {
       if (err && err.name === "AbortError") showMsg("That took too long, so we stopped waiting. Refresh the page: if your name isn't on the list, try again.", "err");
       else showMsg("Couldn't save right now. Check your connection and try again in a minute.", "err");
-    }).then(function () { clearTimeout(timer); busy = false; $("submit").disabled = false; $("submit").textContent = "Sign me up"; });
+    }).then(function () { clearTimeout(timer); busy = false; $("submit").disabled = false; $("submit").textContent = "Submit"; });
   });
 
   load();
